@@ -1,4 +1,4 @@
-/* TinyI2C v2.0.1
+/* TinyI2C v3.0.0
 
    David Johnson-Davies - www.technoblogy.com - 5th June 2022
    
@@ -35,24 +35,24 @@ TinyI2CMaster::TinyI2CMaster() {
 
 // Constants
 // Prepare register value to: Clear flags, and set USI to shift 8 bits i.e. count 16 clock edges.
-unsigned char const USISR_8bit = 1<<USISIF | 1<<USIOIF | 1<<USIPF | 1<<USIDC | 0x0<<USICNT0;
-// Prepare register value to: Clear flags, and set USI to shift 1 bit i.e. count 2 clock edges.
-unsigned char const USISR_1bit = 1<<USISIF | 1<<USIOIF | 1<<USIPF | 1<<USIDC | 0xE<<USICNT0;
+// Change global constants to static constexpr where possible
+static constexpr uint8_t USISR_8bit = 1<<USISIF | 1<<USIOIF | 1<<USIPF | 1<<USIDC | 0x0<<USICNT0;
+static constexpr uint8_t USISR_1bit = 1<<USISIF | 1<<USIOIF | 1<<USIPF | 1<<USIDC | 0xE<<USICNT0;
 
-uint8_t TinyI2CMaster::transfer (uint8_t data) {
-  USISR = data;                                                   // Set USISR according to data.
-                                                                  // Prepare clocking.
-  data = 0<<USISIE | 0<<USIOIE |                                  // Interrupts disabled
-         1<<USIWM1 | 0<<USIWM0 |                                  // Set USI in Two-wire mode.
-         1<<USICS1 | 0<<USICS0 | 1<<USICLK |                      // Software clock strobe as source.
-         1<<USITC;                                                // Toggle Clock Port.
+// Optimize transfer() by reducing variable scope and using register variables
+uint8_t TinyI2CMaster::transfer(uint8_t data) {
+  USISR = data;
+  register uint8_t ctrl = 0<<USISIE | 0<<USIOIE | 
+                          1<<USIWM1 | 0<<USIWM0 |
+                          1<<USICS1 | 0<<USICS0 | 1<<USICLK |
+                          1<<USITC;
   do {
     DELAY_T2TWI;
-    USICR = data;                                                 // Generate positive SCL edge.
-    while (!(PIN_USI_CL & 1<<PIN_USI_SCL));                       // Wait for SCL to go high.
+    USICR = ctrl;
+    while (!(PIN_USI_CL & 1<<PIN_USI_SCL));
     DELAY_T4TWI;
-    USICR = data;                                                 // Generate negative SCL edge.
-  } while (!(USISR & 1<<USIOIF));                                 // Check for transfer complete.
+    USICR = ctrl;
+  } while (!(USISR & 1<<USIOIF));
 
   DELAY_T2TWI;
   data = USIDR;                                                   // Read out data.
@@ -78,18 +78,17 @@ void TinyI2CMaster::init () {
           0x0<<USICNT0;                                           // and reset counter.
 }
 
-uint8_t TinyI2CMaster::read (void) {
+// Optimize read() by removing redundant operations
+uint8_t TinyI2CMaster::read(void) {
   if ((I2Ccount != 0) && (I2Ccount != -1)) I2Ccount--;
   
-  /* Read a byte */
-  DDR_USI &= ~(1<<PIN_USI_SDA);                                   // Enable SDA as input.
-  uint8_t data = TinyI2CMaster::transfer(USISR_8bit);
-
-  /* Prepare to generate ACK (or NACK in case of End Of Transmission) */
-  if (I2Ccount == 0) USIDR = 0xFF; else USIDR = 0x00;
-  TinyI2CMaster::transfer(USISR_1bit);                            // Generate ACK/NACK.
-
-  return data;                                                    // Read successfully completed
+  DDR_USI &= ~(1<<PIN_USI_SDA);
+  uint8_t data = transfer(USISR_8bit);
+  
+  USIDR = (I2Ccount == 0) ? 0xFF : 0x00;
+  transfer(USISR_1bit);
+  
+  return data;
 }
 
 uint8_t TinyI2CMaster::readLast (void) {
