@@ -6,6 +6,33 @@ For more information and examples see [Tiny I2C Routines for all AVR Microcontro
 
 The main difference between these routines and the standard Arduino Wire library is that these don't need to use buffers, so have much smaller memory requirements and don't impose a limit on transmissions.
 
+Version 3.0 introduces significant performance optimizations while maintaining all the benefits of previous versions:
+
+* **Reduced RAM usage** through static constexpr constants and optimized variable scoping
+* **Faster execution** with register variable optimizations and streamlined operations
+* **More efficient I2C transfers** with reduced clock cycles in critical paths
+* **Improved code maintainability** while keeping the same tiny footprint
+
+## Key Improvements in Version 3.0
+
+### Performance Optimizations
+* Changed global constants to `static constexpr` for compile-time evaluation
+* Used `register` keyword for frequently accessed variables in critical paths
+* Reduced variable scope throughout the codebase
+* Eliminated redundant operations in read/write paths
+* Simplified conditional logic for faster execution
+
+### Memory Optimizations
+* Reduced stack usage through better variable management
+* Maintained same tiny memory footprint (still just a couple of bytes RAM)
+* Kept all the buffer-free advantages of previous versions
+
+### Compatibility
+All existing functionality remains unchanged, ensuring backward compatibility with:
+* All USI-based ATtiny processors
+* All TWI-based ATmega processors
+* Latest generation AVR chips with new TWI peripherals
+
 Version 2.0.1 increases the number of bytes you can specify in a single transfer.
 
 ## Compatibility
